@@ -4,7 +4,30 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
   const dir = isRTL ? 'rtl' : 'ltr';
   const langAttr = isRTL ? 'he' : 'en';
 
-  const linesHtml = lines.map(line => renderLine(line, isRTL)).join('\n');
+  const linesHtml = lines.map((line, i) => {
+    const isEmptyLine = line.length === 1 && !line[0].chord && !line[0].lyric.trim();
+    const hasLyric = !isEmptyLine && line.some(s => s.lyric && s.lyric.trim());
+    const isSectionLabel = line.length === 1 && !line[0].chord && isSectionLabelText(line[0].lyric);
+    const prevLine = i > 0 ? lines[i - 1] : null;
+    const prevIsEmpty = prevLine && prevLine.length === 1 && !prevLine[0].chord && !prevLine[0].lyric.trim();
+    const prevIsSectionLabel = prevLine && prevLine.length === 1 && !prevLine[0].chord && isSectionLabelText(prevLine[0].lyric);
+
+    // Add spacer before section labels (but not at the very start)
+    if (isSectionLabel) {
+      const spacer = (prevLine && !prevIsEmpty) ? '<div class="spacer"></div>\n' : '';
+      return spacer + renderLine(line, isRTL);
+    }
+
+    // Suppress spacer immediately after a section label
+    if (prevIsSectionLabel) {
+      return renderLine(line, isRTL);
+    }
+
+    // Insert an extra spacer when transitioning between lyric and chord-only sections
+    const prevHasLyric = prevLine && !prevIsEmpty && prevLine.some(s => s.lyric && s.lyric.trim());
+    const needsSpacer = prevLine && !prevIsEmpty && !isEmptyLine && hasLyric !== prevHasLyric;
+    return (needsSpacer ? '<div class="spacer"></div>\n' : '') + renderLine(line, isRTL);
+  }).join('\n');
 
   const keyInfo = originalKey
     ? `<span class="key-info">Original key: <strong>${escHtml(originalKey)}</strong> → Transposed to: <strong>${escHtml(targetKey)}</strong></span>`
@@ -168,6 +191,12 @@ ${linesHtml}
   </main>
 </body>
 </html>`;
+}
+
+function isSectionLabelText(text) {
+  if (!text) return false;
+  const t = text.trim();
+  return t.length < 25 && t.endsWith(':');
 }
 
 function renderLine(line, isRTL) {
