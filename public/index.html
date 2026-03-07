@@ -185,42 +185,7 @@
       <div class="row">
         <div class="field">
           <label for="key">Transpose to key</label>
-          <select id="key">
-            <option>C</option>
-            <option>C#</option>
-            <option>Db</option>
-            <option>D</option>
-            <option>D#</option>
-            <option>Eb</option>
-            <option>E</option>
-            <option>F</option>
-            <option>F#</option>
-            <option>Gb</option>
-            <option>G</option>
-            <option>G#</option>
-            <option>Ab</option>
-            <option>A</option>
-            <option>A#</option>
-            <option>Bb</option>
-            <option>B</option>
-            <option>Am</option>
-            <option>A#m</option>
-            <option>Bbm</option>
-            <option>Bm</option>
-            <option>Cm</option>
-            <option>C#m</option>
-            <option>Dbm</option>
-            <option>Dm</option>
-            <option>D#m</option>
-            <option>Ebm</option>
-            <option>Em</option>
-            <option>Fm</option>
-            <option>F#m</option>
-            <option>Gbm</option>
-            <option>Gm</option>
-            <option>G#m</option>
-            <option>Abm</option>
-          </select>
+          <select id="key"></select>
         </div>
       </div>
 
@@ -241,6 +206,21 @@
     const transposeBtn = document.getElementById('transposeBtn');
     const statusEl    = document.getElementById('status');
     const shareLinkEl = document.getElementById('shareLink');
+
+    const MAJOR_KEYS = ['C','C#','Db','D','D#','Eb','E','F','F#','Gb','G','G#','Ab','A','A#','Bb','B'];
+    const MINOR_KEYS = ['Am','A#m','Bbm','Bm','Cm','C#m','Dbm','Dm','D#m','Ebm','Em','Fm','F#m','Gbm','Gm','G#m','Abm'];
+
+    function isMinorKey(key) {
+      return key && key.endsWith('m');
+    }
+
+    function populateKeyDropdown(originalKey) {
+      const keys = isMinorKey(originalKey) ? MINOR_KEYS : MAJOR_KEYS;
+      keySelect.innerHTML = keys.map(k => `<option>${k}</option>`).join('');
+      // Pre-select the original key if it's in the list
+      const opt = [...keySelect.options].find(o => o.value === originalKey);
+      if (opt) keySelect.value = originalKey;
+    }
 
     let detectedOriginalKey = null;
     let detectController = null;
@@ -289,11 +269,8 @@
         originalKeyBadge.textContent = data.originalKey || '?';
         detectedKey.classList.add('visible');
 
-        // Pre-select the same key in the dropdown (user can change it)
-        if (data.originalKey) {
-          const opt = [...keySelect.options].find(o => o.value === data.originalKey);
-          if (opt) keySelect.value = data.originalKey;
-        }
+        // Populate dropdown with only major or minor keys, pre-selected to original
+        populateKeyDropdown(data.originalKey);
 
         step2.classList.add('visible');
         shareLinkEl.style.display = 'none';
