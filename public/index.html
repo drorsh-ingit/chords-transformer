@@ -26,17 +26,9 @@
       max-width: 560px;
     }
 
-    h1 {
-      font-size: 1.8rem;
-      margin-bottom: 0.4rem;
-      color: #1a1a1a;
-    }
+    h1 { font-size: 1.8rem; margin-bottom: 0.4rem; color: #1a1a1a; }
 
-    .subtitle {
-      color: #666;
-      margin-bottom: 2rem;
-      font-size: 0.95rem;
-    }
+    .subtitle { color: #666; margin-bottom: 2rem; font-size: 0.95rem; }
 
     label {
       display: block;
@@ -46,9 +38,7 @@
       font-size: 0.9rem;
     }
 
-    .field {
-      margin-bottom: 1.2rem;
-    }
+    .field { margin-bottom: 1.2rem; }
 
     input[type="text"], select {
       width: 100%;
@@ -66,6 +56,45 @@
       box-shadow: 0 0 0 3px rgba(26,111,168,0.12);
     }
 
+    .hint { font-size: 0.8rem; color: #888; margin-top: 0.3rem; }
+
+    /* Key detection result */
+    .detected-key {
+      display: none;
+      background: #f0faf0;
+      border: 1px solid #b3e0b3;
+      border-radius: 7px;
+      padding: 0.8rem 1rem;
+      margin-bottom: 1.2rem;
+      font-size: 0.95rem;
+    }
+
+    .detected-key.visible { display: block; }
+
+    .detected-key .song-meta {
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+      color: #1a1a1a;
+      font-size: 1rem;
+    }
+
+    .detected-key .key-badge {
+      display: inline-block;
+      background: #1a6fa8;
+      color: white;
+      border-radius: 4px;
+      padding: 0.1rem 0.5rem;
+      font-weight: 700;
+      font-family: monospace;
+      font-size: 1rem;
+    }
+
+    /* Step 2: target key + button — hidden until key is detected */
+    .step2 {
+      display: none;
+    }
+    .step2.visible { display: block; }
+
     .row {
       display: flex;
       gap: 1rem;
@@ -73,10 +102,7 @@
       margin-bottom: 1.2rem;
     }
 
-    .row .field {
-      flex: 1;
-      margin-bottom: 0;
-    }
+    .row .field { flex: 1; margin-bottom: 0; }
 
     button {
       width: 100%;
@@ -93,11 +119,7 @@
 
     button:hover { background: #155d8e; }
     button:active { background: #104c75; }
-
-    button:disabled {
-      background: #999;
-      cursor: not-allowed;
-    }
+    button:disabled { background: #999; cursor: not-allowed; }
 
     .status {
       margin-top: 1rem;
@@ -133,12 +155,6 @@
     }
 
     .share-link a { color: #1a6fa8; }
-
-    .hint {
-      font-size: 0.8rem;
-      color: #888;
-      margin-top: 0.3rem;
-    }
   </style>
 </head>
 <body>
@@ -146,24 +162,30 @@
     <h1>Chords Transformer</h1>
     <p class="subtitle">Transpose any tab4u.com song to your preferred key</p>
 
-    <form id="form">
-      <div class="field">
-        <label for="url">tab4u.com Song URL</label>
-        <input
-          type="text"
-          id="url"
-          name="url"
-          placeholder="https://www.tab4u.com/..."
-          autocomplete="off"
-          required
-        >
-        <p class="hint">Paste a full song URL from tab4u.com</p>
-      </div>
+    <!-- Step 1: URL input -->
+    <div class="field">
+      <label for="url">tab4u.com Song URL</label>
+      <input
+        type="text"
+        id="url"
+        placeholder="https://www.tab4u.com/..."
+        autocomplete="off"
+      >
+      <p class="hint">Paste a song URL — the key will be detected automatically</p>
+    </div>
 
+    <!-- Detected key display -->
+    <div class="detected-key" id="detectedKey">
+      <div class="song-meta" id="songMeta"></div>
+      <div>Original key: <span class="key-badge" id="originalKeyBadge"></span></div>
+    </div>
+
+    <!-- Step 2: target key + transpose -->
+    <div class="step2" id="step2">
       <div class="row">
         <div class="field">
-          <label for="key">Target Key</label>
-          <select id="key" name="targetKey">
+          <label for="key">Transpose to key</label>
+          <select id="key">
             <option>C</option>
             <option>C#</option>
             <option>Db</option>
@@ -192,70 +214,145 @@
         </div>
       </div>
 
-      <button type="submit" id="btn">Transpose</button>
-    </form>
+      <button id="transposeBtn">Transpose</button>
+    </div>
 
     <div class="status" id="status"></div>
     <div class="share-link" id="shareLink"></div>
   </div>
 
   <script>
-    const form = document.getElementById('form');
-    const btn = document.getElementById('btn');
-    const statusEl = document.getElementById('status');
+    const urlInput    = document.getElementById('url');
+    const detectedKey = document.getElementById('detectedKey');
+    const songMeta    = document.getElementById('songMeta');
+    const originalKeyBadge = document.getElementById('originalKeyBadge');
+    const step2       = document.getElementById('step2');
+    const keySelect   = document.getElementById('key');
+    const transposeBtn = document.getElementById('transposeBtn');
+    const statusEl    = document.getElementById('status');
     const shareLinkEl = document.getElementById('shareLink');
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
+    let detectedOriginalKey = null;
+    let detectController = null;
 
-      const url = document.getElementById('url').value.trim();
-      const targetKey = document.getElementById('key').value;
+    // Auto-detect key when URL is pasted or typed (debounced)
+    let detectTimer = null;
+    urlInput.addEventListener('input', () => {
+      clearTimeout(detectTimer);
+      const url = urlInput.value.trim();
+      if (!url.startsWith('http')) {
+        resetStep2();
+        return;
+      }
+      detectTimer = setTimeout(() => detectKey(url), 600);
+    });
 
+    async function detectKey(url) {
+      // Cancel any in-flight request
+      if (detectController) detectController.abort();
+      detectController = new AbortController();
+
+      resetStep2();
+      showStatus('loading', 'Detecting key…');
+
+      try {
+        const res = await fetch('/detect-key', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url }),
+          signal: detectController.signal
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          showStatus('error', data.error || 'Could not detect key');
+          return;
+        }
+
+        hideStatus();
+        detectedOriginalKey = data.originalKey;
+
+        // Show song info
+        const parts = [data.title, data.artist].filter(Boolean);
+        songMeta.textContent = parts.join(' — ');
+        originalKeyBadge.textContent = data.originalKey || '?';
+        detectedKey.classList.add('visible');
+
+        // Pre-select the same key in the dropdown (user can change it)
+        if (data.originalKey) {
+          const opt = [...keySelect.options].find(o => o.value === data.originalKey);
+          if (opt) keySelect.value = data.originalKey;
+        }
+
+        step2.classList.add('visible');
+        shareLinkEl.style.display = 'none';
+
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        showStatus('error', 'Network error: ' + err.message);
+      }
+    }
+
+    transposeBtn.addEventListener('click', async () => {
+      const url = urlInput.value.trim();
+      const targetKey = keySelect.value;
       if (!url) return;
 
-      btn.disabled = true;
-      statusEl.className = 'status loading';
-      statusEl.textContent = 'Fetching and transposing...';
+      transposeBtn.disabled = true;
+      showStatus('loading', 'Transposing…');
       shareLinkEl.style.display = 'none';
 
       try {
-        const response = await fetch('/transpose', {
+        const res = await fetch('/transpose', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ url, targetKey })
         });
 
-        const html = await response.text();
+        const html = await res.text();
 
-        if (!response.ok) {
-          statusEl.className = 'status error';
-          statusEl.textContent = 'Error: ' + (extractError(html) || response.statusText);
+        if (!res.ok) {
+          showStatus('error', 'Error: ' + (extractError(html) || res.statusText));
           return;
         }
 
-        statusEl.style.display = 'none';
+        hideStatus();
 
-        // Open in new tab
         const blob = new Blob([html], { type: 'text/html' });
-        const objectUrl = URL.createObjectURL(blob);
-        window.open(objectUrl, '_blank');
+        window.open(URL.createObjectURL(blob), '_blank');
 
-        // Show shareable link
         const shareUrl = `/song?url=${encodeURIComponent(url)}&key=${encodeURIComponent(targetKey)}`;
         shareLinkEl.style.display = 'block';
         shareLinkEl.innerHTML = `Shareable link: <a href="${shareUrl}" target="_blank">${location.origin}${shareUrl}</a>`;
 
       } catch (err) {
-        statusEl.className = 'status error';
-        statusEl.textContent = 'Network error: ' + err.message;
+        showStatus('error', 'Network error: ' + err.message);
       } finally {
-        btn.disabled = false;
+        transposeBtn.disabled = false;
       }
     });
 
+    function resetStep2() {
+      detectedKey.classList.remove('visible');
+      step2.classList.remove('visible');
+      shareLinkEl.style.display = 'none';
+      detectedOriginalKey = null;
+    }
+
+    function showStatus(type, msg) {
+      statusEl.className = 'status ' + type;
+      statusEl.textContent = msg;
+    }
+
+    function hideStatus() {
+      statusEl.className = 'status';
+      statusEl.style.display = 'none';
+    }
+
     function extractError(html) {
-      const match = html.match(/<p>(.*?)<\/p>/);
-      return match ? match[1] : null;
+      const m = html.match(/<p>(.*?)<\/p>/);
+      return m ? m[1] : null;
     }
   </script>
 </body>

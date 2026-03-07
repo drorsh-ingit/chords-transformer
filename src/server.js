@@ -13,6 +13,20 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+// POST /detect-key — scrape song and return metadata without transposing
+app.post('/detect-key', async (req, res) => {
+  const { url } = req.body;
+  if (!url) return res.status(400).json({ error: 'Missing url' });
+
+  try {
+    const song = await scrapeSong(url);
+    res.json({ originalKey: song.originalKey, title: song.title, artist: song.artist });
+  } catch (err) {
+    console.error('Detect-key error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /transpose — used by the UI form
 app.post('/transpose', async (req, res) => {
   const { url, targetKey } = req.body;
