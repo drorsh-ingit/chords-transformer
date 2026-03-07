@@ -81,9 +81,9 @@ function parseTab4uTable($, rows) {
     const row = rowData[i];
 
     if (row.type === 'chords') {
-      // Detect original key from the first chord we encounter
+      // Detect original key from the first chord (preserve minor suffix)
       if (!originalKey && row.chords.length > 0) {
-        const m = row.chords[0].chord.match(/^([A-G][b#]?)/);
+        const m = row.chords[0].chord.match(/^([A-G][b#]?m?)/);
         if (m) originalKey = m[1];
       }
 
