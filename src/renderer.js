@@ -41,7 +41,6 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
   <title>${escHtml(title || 'Song')} — ${escHtml(targetKey)}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { overflow-x: hidden; }
 
     body {
       font-family: 'Courier New', Courier, monospace;
@@ -173,10 +172,11 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
     }
 
     @media (max-width: 600px) {
-      body { padding: 1rem; }
+      body { padding: 0.75rem; }
       header h1 { font-size: 1.3rem; }
-      .chord, .chord-row { font-size: 1rem; }
-      .lyric, .lyric-row { font-size: 0.9rem; }
+      .chord, .chord-row { font-size: 0.8rem; }
+      .lyric, .lyric-row { font-size: 0.75rem; }
+      .rtl-line { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     }
   </style>
 </head>
