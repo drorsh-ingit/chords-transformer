@@ -74,20 +74,8 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
 
     .spacer { height: 1.4em; }
 
-    /* ── Chord+lyric lines ──
-       Both chord-row and lyric-row are white-space:pre blocks sharing the
-       same direction.  For RTL songs the container sets direction:rtl so
-       both rows are rendered right-to-left with character[0] at the
-       right edge — identical coordinate system in both rows, no bidi
-       reordering misalignment.  For LTR songs the default ltr direction
-       applies. */
+    /* ── LTR chord+lyric lines ── pre-formatted two-row approach */
     .ltr-line {
-      margin-bottom: 0.15em;
-      overflow-x: auto;
-    }
-
-    .rtl-line {
-      direction: rtl;
       margin-bottom: 0.15em;
       overflow-x: auto;
     }
@@ -99,28 +87,9 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
       min-height: 1.6em;
       line-height: 1.4;
       white-space: pre;
-      margin-bottom: 2px; /* matches tab4u table border-spacing: 0px 2px */
+      margin-bottom: 2px;
     }
 
-    /* Force chord row to lay out RTL so LTR chord names (e.g. "Eb", "Cm")
-       share the same right-anchored coordinate system as the Hebrew lyric row.
-       Without this, the bidi algorithm places the LTR run on the LEFT while
-       Hebrew sits on the RIGHT, breaking column alignment. */
-    .rtl-line .chord-row {
-      unicode-bidi: bidi-override;
-    }
-
-    /* Nested LTR override restores correct left-to-right letter order within
-       each chord badge (outer RTL override positions the badge, inner LTR
-       override makes "Eb" read E-b rather than b-E). */
-    .rtl-line .chord-row .chord-badge {
-      unicode-bidi: bidi-override;
-      direction: ltr;
-    }
-
-    /* Matches tab4u's .c_C exactly:
-       padding adds the visual pill, negative margin cancels its layout effect
-       so the badge text aligns with the lyric without shifting positions. */
     .chord-badge {
       display: inline;
       border-radius: 4px;
@@ -133,6 +102,44 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
 
     .lyric-row {
       display: block;
+      font-size: 1rem;
+      line-height: 1.6;
+      white-space: pre;
+    }
+
+    /* ── RTL chord+lyric lines ──
+       Each segment is a flex-column (chord on top, lyric below) and all
+       segments sit inside a flex-row container with direction:rtl.
+       direction:rtl makes flex items flow RIGHT→LEFT so segment[0] lands
+       at the visual right edge — exactly where the first Hebrew character
+       is.  No bidi override magic needed; each column aligns naturally. */
+    .rtl-line {
+      display: flex;
+      flex-direction: row;
+      flex-wrap: nowrap;
+      direction: rtl;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 0.15em;
+    }
+
+    .rtl-seg {
+      display: inline-flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      direction: rtl;
+    }
+
+    .rtl-seg-chord {
+      font-size: 1rem;
+      font-weight: bold;
+      min-height: 1.6em;
+      line-height: 1.4;
+      white-space: pre;
+      margin-bottom: 2px;
+    }
+
+    .rtl-seg-lyric {
       font-size: 1rem;
       line-height: 1.6;
       white-space: pre;
@@ -183,8 +190,8 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
       header h1 { font-size: 16pt; }
       header .artist { font-size: 12pt; }
       .key-info { font-size: 10pt; }
-      .chord-row, .tab-chord-row { font-size: 9pt; }
-      .lyric-row, .ltr-lyric-only, .rtl-lyric-only { font-size: 10pt; }
+      .chord-row, .rtl-seg-chord, .tab-chord-row { font-size: 9pt; }
+      .lyric-row, .rtl-seg-lyric, .ltr-lyric-only, .rtl-lyric-only { font-size: 10pt; }
       .spacer { height: 0.6cm; }
       .ltr-line, .rtl-line { page-break-inside: avoid; }
       .song-body { orphans: 3; widows: 3; }
@@ -193,8 +200,8 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
     @media (max-width: 600px) {
       body { padding: 0.75rem; }
       header h1 { font-size: 1.3rem; }
-      .chord-row, .tab-chord-row { font-size: 0.8rem; }
-      .lyric-row, .ltr-lyric-only, .rtl-lyric-only { font-size: 0.75rem; }
+      .chord-row, .rtl-seg-chord, .tab-chord-row { font-size: 0.8rem; }
+      .lyric-row, .rtl-seg-lyric, .ltr-lyric-only, .rtl-lyric-only { font-size: 0.75rem; }
       .ltr-line, .rtl-line { overflow-x: auto; -webkit-overflow-scrolling: touch; }
     }
   </style>
@@ -276,6 +283,28 @@ function renderLine(line, isRTL) {
     return `<div class="${cls}">${escHtml(text)}</div>`;
   }
 
+  if (isRTL) {
+    // RTL songs: render as a flex-row (direction:rtl) of segment columns.
+    // Each segment is a flex-column with the chord badge on top and the lyric
+    // below.  direction:rtl on the container makes segment[0] land at the
+    // visual RIGHT edge, matching the first Hebrew character — no bidi tricks.
+    let segHtml = '';
+    for (const seg of line) {
+      const chord = seg.chord || '';
+      const lyric = seg.lyric || '';
+      // Chord-only segments: pad the lyric span so the chord has breathing room.
+      const displayLyric = !lyric.trim() && chord
+        ? '\u00a0'.repeat(chord.length + 2)
+        : lyric;
+      const chordHtml = chord
+        ? `<span class="chord-badge">${escHtml(chord)}</span>`
+        : '\u00a0'; // non-breaking space maintains row height
+      segHtml += `<div class="rtl-seg"><div class="rtl-seg-chord">${chordHtml}</div><div class="rtl-seg-lyric">${escHtml(displayLyric)}</div></div>`;
+    }
+    return `<div class="rtl-line">${segHtml}</div>`;
+  }
+
+  // LTR songs: pre-formatted two-row approach.
   let chordStr = '';
   let lyricStr = '';
   for (const seg of line) {
@@ -289,8 +318,7 @@ function renderLine(line, isRTL) {
     lyricStr += lyric.padEnd(width);
   }
 
-  const lineClass = isRTL ? 'rtl-line' : 'ltr-line';
-  return `<div class="${lineClass}"><div class="chord-row">${badgeHtml(chordStr)}</div><div class="lyric-row">${escHtml(lyricStr)}</div></div>`;
+  return `<div class="ltr-line"><div class="chord-row">${badgeHtml(chordStr)}</div><div class="lyric-row">${escHtml(lyricStr)}</div></div>`;
 }
 
 /**
