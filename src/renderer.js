@@ -117,7 +117,7 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
       display: flex;
       flex-direction: row;
       flex-wrap: nowrap;
-      direction: rtl;
+      justify-content: flex-end;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       margin-bottom: 0.15em;
@@ -284,12 +284,11 @@ function renderLine(line, isRTL) {
   }
 
   if (isRTL) {
-    // RTL songs: render as a flex-row (direction:rtl) of segment columns.
-    // Each segment is a flex-column with the chord badge on top and the lyric
-    // below.  direction:rtl on the container makes segment[0] land at the
-    // visual RIGHT edge, matching the first Hebrew character — no bidi tricks.
+    // RTL songs: render segments in reversed order inside a LTR flex row.
+    // Reversing puts the first chord at the visual right (last in LTR flow)
+    // where the first Hebrew character naturally appears.
     let segHtml = '';
-    for (const seg of line) {
+    for (const seg of [...line].reverse()) {
       const chord = seg.chord || '';
       const lyric = seg.lyric || '';
       // Chord-only segments: pad the lyric span so the chord has breathing room.
