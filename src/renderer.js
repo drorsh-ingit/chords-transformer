@@ -5,12 +5,15 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
   const langAttr = isRTL ? 'he' : 'en';
 
   const linesHtml = lines.map((line, i) => {
+    if (line.isTabBlock) return renderTabBlock(line);
+
     const isEmptyLine = line.length === 1 && !line[0].chord && !line[0].lyric.trim();
     const hasLyric = !isEmptyLine && line.some(s => s.lyric && s.lyric.trim());
     const isSectionLabel = line.length === 1 && !line[0].chord && isSectionLabelText(line[0].lyric);
     const prevLine = i > 0 ? lines[i - 1] : null;
-    const prevIsEmpty = prevLine && prevLine.length === 1 && !prevLine[0].chord && !prevLine[0].lyric.trim();
-    const prevIsSectionLabel = prevLine && prevLine.length === 1 && !prevLine[0].chord && isSectionLabelText(prevLine[0].lyric);
+    const prevIsTabBlock = prevLine && prevLine.isTabBlock;
+    const prevIsEmpty = !prevIsTabBlock && prevLine && prevLine.length === 1 && !prevLine[0].chord && !prevLine[0].lyric.trim();
+    const prevIsSectionLabel = !prevIsTabBlock && prevLine && prevLine.length === 1 && !prevLine[0].chord && isSectionLabelText(prevLine[0].lyric);
 
     // Add spacer before section labels (but not at the very start)
     if (isSectionLabel) {
@@ -24,8 +27,8 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
     }
 
     // Insert an extra spacer when transitioning between lyric and chord-only sections
-    const prevHasLyric = prevLine && !prevIsEmpty && prevLine.some(s => s.lyric && s.lyric.trim());
-    const needsSpacer = prevLine && !prevIsEmpty && !isEmptyLine && hasLyric !== prevHasLyric;
+    const prevHasLyric = !prevIsTabBlock && prevLine && !prevIsEmpty && prevLine.some(s => s.lyric && s.lyric.trim());
+    const needsSpacer = prevLine && !prevIsEmpty && !prevIsTabBlock && !isEmptyLine && hasLyric !== prevHasLyric;
     return (needsSpacer ? '<div class="spacer"></div>\n' : '') + renderLine(line, isRTL);
   }).join('\n');
 
@@ -147,6 +150,32 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
       margin-bottom: 0.1em;
     }
 
+    /* ── Tab blocks ── always LTR regardless of song direction */
+    .tab-block {
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.92rem;
+      direction: ltr;
+      text-align: left;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      margin-bottom: 1em;
+    }
+
+    .tab-chord-row {
+      white-space: pre;
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: #1a6fa8;
+      min-height: 1.4em;
+      line-height: 1.3;
+    }
+
+    .tab-string {
+      white-space: pre;
+      color: #333;
+      line-height: 1.5;
+    }
+
     /* Print styles */
     @media print {
       body {
@@ -262,6 +291,44 @@ function renderRTLLine(line, hasChords) {
   <div class="chord-row">${escHtml(chordStr)}</div>
   <div class="lyric-row">${escHtml(lyricStr)}</div>
 </div>`;
+}
+
+/**
+ * After transposition, fret numbers may change digit count (e.g. 9→10),
+ * making some strings longer than others. Pad shorter strings with dashes
+ * before the trailing | to restore equal lengths.
+ */
+function normalizeTabStrings(strings) {
+  if (strings.length === 0) return strings;
+  const maxLen = Math.max(...strings.map(s => s.length));
+  return strings.map(s => {
+    const diff = maxLen - s.length;
+    if (diff === 0) return s;
+    if (s.endsWith('|')) return s.slice(0, -1) + '-'.repeat(diff) + '|';
+    return s + '-'.repeat(diff);
+  });
+}
+
+function renderTabBlock(block) {
+  let html = '<div class="tab-block">';
+
+  // Chord names above the tab (e.g. "Am   G   F")
+  if (block.chordsAbove && block.chordsAbove.length > 0) {
+    const maxPos = Math.max(...block.chordsAbove.map(c => c.pos + c.chord.length)) + 2;
+    const arr = new Array(Math.max(maxPos, 40)).fill(' ');
+    for (const { chord, pos } of block.chordsAbove) {
+      for (let j = 0; j < chord.length; j++) arr[pos + j] = chord[j];
+    }
+    html += `<div class="tab-chord-row">${escHtml(arr.join('').trimEnd())}</div>`;
+  }
+
+  const strings = normalizeTabStrings(block.strings);
+  for (const str of strings) {
+    html += `<div class="tab-string">${escHtml(str)}</div>`;
+  }
+
+  html += '</div>';
+  return html;
 }
 
 function escHtml(str) {
