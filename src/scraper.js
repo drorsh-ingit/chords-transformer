@@ -71,6 +71,8 @@ function parseTab4uTable($, rows) {
       rowData.push({ type: 'chords', cls, chords: extractChordSpans($, td) });
     } else if (cls === 'song') {
       rowData.push({ type: 'song', text: td.text() });
+    } else if (cls === 'tabs') {
+      rowData.push({ type: 'tabs', text: td.text().trim() });
     }
   });
 
@@ -87,7 +89,15 @@ function parseTab4uTable($, rows) {
         if (m) originalKey = m[1];
       }
 
-      if (i + 1 < rowData.length && rowData[i + 1].type === 'song') {
+      if (i + 1 < rowData.length && rowData[i + 1].type === 'tabs') {
+        // Tab block: chord row followed by tab string rows
+        const strings = [];
+        while (i + 1 < rowData.length && rowData[i + 1].type === 'tabs') {
+          i++;
+          strings.push(rowData[i].text);
+        }
+        lines.push({ isTabBlock: true, chordsAbove: row.chords, strings });
+      } else if (i + 1 < rowData.length && rowData[i + 1].type === 'song') {
         const line = buildChordLyricLine(row.chords, rowData[i + 1].text);
         if (line.length > 0) lines.push(line);
         i++; // consume the song row
@@ -96,6 +106,15 @@ function parseTab4uTable($, rows) {
         const line = row.chords.map(c => ({ chord: c.chord, lyric: '' }));
         if (line.length > 0) lines.push(line);
       }
+
+    } else if (row.type === 'tabs') {
+      // Tab block without preceding chords row
+      const strings = [row.text];
+      while (i + 1 < rowData.length && rowData[i + 1].type === 'tabs') {
+        i++;
+        strings.push(rowData[i].text);
+      }
+      lines.push({ isTabBlock: true, chordsAbove: [], strings });
 
     } else if (row.type === 'song') {
       // English style: td.song comes BEFORE its chord row (td.chords_en follows)

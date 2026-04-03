@@ -1,0 +1,8 @@
+{
+  "outputDirectory": "public",
+  "rewrites": [
+    { "source": "/detect-key", "destination": "https://YOUR-RAILWAY-URL/detect-key" },
+    { "source": "/transpose", "destination": "https://YOUR-RAILWAY-URL/transpose" },
+    { "source": "/song", "destination": "https://YOUR-RAILWAY-URL/song" }
+  ]
+}

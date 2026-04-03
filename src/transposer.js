@@ -61,12 +61,36 @@ function transposeLines(lines, fromKey, toKey) {
   const semitones = getSemitones(fromKey, toKey);
   const preferFlats = FLAT_KEYS.has(toKey);
 
-  return lines.map(line =>
-    line.map(segment => ({
+  return lines.map(line => {
+    if (line.isTabBlock) {
+      return {
+        isTabBlock: true,
+        chordsAbove: line.chordsAbove.map(c => ({
+          ...c,
+          chord: transposeChord(c.chord, semitones, preferFlats),
+        })),
+        strings: line.strings.map(str => transposeTabString(str, semitones)),
+      };
+    }
+    return line.map(segment => ({
       chord: segment.chord ? transposeChord(segment.chord, semitones, preferFlats) : null,
-      lyric: segment.lyric
-    }))
-  );
+      lyric: segment.lyric,
+    }));
+  });
+}
+
+function transposeTabString(str, semitones) {
+  if (semitones === 0) return str;
+  const pipeIdx = str.indexOf('|');
+  if (pipeIdx === -1) return str;
+  const prefix = str.slice(0, pipeIdx + 1);
+  const body = str.slice(pipeIdx + 1);
+  const transposed = body.replace(/\d+/g, match => {
+    const newFret = Math.max(0, parseInt(match, 10) + semitones);
+    const result = String(newFret);
+    return result.length < match.length ? result + '-'.repeat(match.length - result.length) : result;
+  });
+  return prefix + transposed;
 }
 
 module.exports = { transposeLines, getSemitones, parseChord, transposeChord };
