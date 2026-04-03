@@ -1,8 +1,8 @@
 {
   "outputDirectory": "public",
   "rewrites": [
-    { "source": "/detect-key", "destination": "https://YOUR-RAILWAY-URL/detect-key" },
-    { "source": "/transpose", "destination": "https://YOUR-RAILWAY-URL/transpose" },
-    { "source": "/song", "destination": "https://YOUR-RAILWAY-URL/song" }
+    { "source": "/detect-key", "destination": "https://chords-transformer-production-26b7.up.railway.app/detect-key" },
+    { "source": "/transpose", "destination": "https://chords-transformer-production-26b7.up.railway.app/transpose" },
+    { "source": "/song", "destination": "https://chords-transformer-production-26b7.up.railway.app/song" }
   ]
 }
