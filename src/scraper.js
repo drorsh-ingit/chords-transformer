@@ -96,7 +96,10 @@ function parseTab4uTable($, rows) {
           i++;
           strings.push(rowData[i].text);
         }
-        lines.push({ isTabBlock: true, chordsAbove: row.chords, strings });
+        // Split into separate blocks if string labels repeat (two tab sections)
+        for (const group of splitTabGroups(strings)) {
+          lines.push({ isTabBlock: true, chordsAbove: row.chords, strings: group });
+        }
       } else if (i + 1 < rowData.length && rowData[i + 1].type === 'song') {
         const line = buildChordLyricLine(row.chords, rowData[i + 1].text);
         if (line.length > 0) lines.push(line);
@@ -114,7 +117,9 @@ function parseTab4uTable($, rows) {
         i++;
         strings.push(rowData[i].text);
       }
-      lines.push({ isTabBlock: true, chordsAbove: [], strings });
+      for (const group of splitTabGroups(strings)) {
+        lines.push({ isTabBlock: true, chordsAbove: [], strings: group });
+      }
 
     } else if (row.type === 'song') {
       // English style: td.song comes BEFORE its chord row (td.chords_en follows)
@@ -302,6 +307,33 @@ function mergeChordAndLyricLine(chordLine, lyricLine) {
     if (prefix) segments.unshift({ chord: null, lyric: prefix });
   }
   return segments;
+}
+
+/**
+ * Split a flat array of tab strings into groups when a string label repeats.
+ * e.g. [e|..., B|..., G|..., D|..., A|..., E|..., e|..., B|..., ...]
+ * becomes two groups of 6.
+ * The string label is the text before the first '|'.
+ */
+function splitTabGroups(strings) {
+  const groups = [];
+  let current = [];
+  const seen = new Set();
+
+  for (const str of strings) {
+    const pipeIdx = str.indexOf('|');
+    const label = pipeIdx > -1 ? str.slice(0, pipeIdx).trim() : '';
+    if (label && seen.has(label) && current.length > 0) {
+      groups.push(current);
+      current = [];
+      seen.clear();
+    }
+    current.push(str);
+    if (label) seen.add(label);
+  }
+
+  if (current.length > 0) groups.push(current);
+  return groups;
 }
 
 module.exports = { scrapeSong };
