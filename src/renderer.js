@@ -15,6 +15,11 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
     const prevIsEmpty = !prevIsTabBlock && prevLine && prevLine.length === 1 && !prevLine[0].chord && !prevLine[0].lyric.trim();
     const prevIsSectionLabel = !prevIsTabBlock && prevLine && prevLine.length === 1 && !prevLine[0].chord && isSectionLabelText(prevLine[0].lyric);
 
+    // Always add spacer after a tab block
+    if (prevIsTabBlock) {
+      return '<div class="spacer"></div>\n' + renderLine(line, isRTL);
+    }
+
     // Add spacer before section labels (but not at the very start)
     if (isSectionLabel) {
       const spacer = (prevLine && !prevIsEmpty) ? '<div class="spacer"></div>\n' : '';
@@ -27,8 +32,8 @@ function renderSong({ title, artist, originalKey, targetKey, isRTL, lines }) {
     }
 
     // Insert an extra spacer when transitioning between lyric and chord-only sections
-    const prevHasLyric = !prevIsTabBlock && prevLine && !prevIsEmpty && prevLine.some(s => s.lyric && s.lyric.trim());
-    const needsSpacer = prevLine && !prevIsEmpty && !prevIsTabBlock && !isEmptyLine && hasLyric !== prevHasLyric;
+    const prevHasLyric = prevLine && !prevIsEmpty && prevLine.some(s => s.lyric && s.lyric.trim());
+    const needsSpacer = prevLine && !prevIsEmpty && !isEmptyLine && hasLyric !== prevHasLyric;
     return (needsSpacer ? '<div class="spacer"></div>\n' : '') + renderLine(line, isRTL);
   }).join('\n');
 
